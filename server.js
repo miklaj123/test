@@ -3,6 +3,7 @@ const mineflayer = require('mineflayer');
 const path = require('path');
 const bodyParser = require('body-parser');
 const WebSocket = require('ws');
+const { SocksProxyAgent } = require('socks-proxy-agent');
 
 const app = express();
 const port = 3000;
@@ -11,7 +12,6 @@ const wss = new WebSocket.Server({ port: wsPort });
 
 let bots = [];
 let currentProxy = null;
-let proxyErrorReported = false; // Flag to track if proxy error has been reported
 
 // Middleware to parse JSON bodies
 app.use(bodyParser.json());
@@ -29,7 +29,7 @@ function broadcast(message) {
 }
 
 // Function to start a single bot with a delay and an optional proxy IP
-function startBot(host, port, proxyHost, proxyPort, botCount, delay) {
+function startBot(host, port, proxy, botCount, delay) {
   for (let i = 0; i < botCount; i++) {
     setTimeout(() => {
       const random_number = Math.floor(Math.random() * 1000);
@@ -43,10 +43,13 @@ function startBot(host, port, proxyHost, proxyPort, botCount, delay) {
       };
 
       // Add proxy if provided
-      if (proxyHost && proxyPort) {
-        // Set proxy IP and port for bot connection
-        botOptions.host = proxyHost;
-        botOptions.port = proxyPort;
+      if (proxy) {
+        botOptions = {
+          ...botOptions,
+          // Use proxy for bot connection
+          socksPort: proxy.split(':')[1], // assuming proxy format is IP:Port
+          proxy: proxy.split(':')[0] // assuming proxy format is IP:Port
+        };
       }
 
       console.log('Bot Options:', botOptions); // Log bot options
@@ -57,22 +60,16 @@ function startBot(host, port, proxyHost, proxyPort, botCount, delay) {
         const message = `Bot ${BOT_USERNAME} spawned and logged in.`;
         console.log(message);
         broadcast(message);
-        proxyErrorReported = false; // Reset the proxy error flag upon successful login
       });
 
       bot.on('error', (err) => {
-        if (!proxyErrorReported) {
-          const errorMessage = `[ProxyError] [] [${proxyHost}:${proxyPort}] Error: ${err.message}`;
-          console.log(errorMessage);
-          broadcast(errorMessage);
+        const errorMessage = `[ProxyError] [] [${proxy}] Error: ${err.message}`;
+        console.log(errorMessage);
+        broadcast(errorMessage);
 
-          if (err.message.includes('ETIMEDOUT')) {
-            // Stop further attempts with this proxy
-            currentProxy = null;
-            broadcast(`Błąd - Timeout Proxy (${proxyHost}:${proxyPort})`); // Report proxy timeout error
-          }
-
-          proxyErrorReported = true; // Set the flag to true after reporting the error
+        if (err.message.includes('ETIMEDOUT')) {
+          // Stop further attempts with this proxy
+          currentProxy = null;
         }
       });
 
@@ -90,7 +87,7 @@ function startBot(host, port, proxyHost, proxyPort, botCount, delay) {
 
 // Endpoint to start the bot(s) with optional proxy IP
 app.post('/start-bot', (req, res) => {
-  const { host, port, botCount, proxy } = req.body;
+  const { host, port, proxyList, botCount } = req.body;
   const delay = 1000; // 1 second delay between bot spawns
 
   if (bots.length > 0) {
@@ -98,19 +95,23 @@ app.post('/start-bot', (req, res) => {
     return;
   }
 
-  let proxyHost = null;
-  let proxyPort = null;
+  if (proxyList.length > 0) {
+    // Try next proxy if the previous one timed out
+    const availableProxies = proxyList.filter(proxy => proxy !== currentProxy);
+    currentProxy = availableProxies.length > 0 ? availableProxies[0] : null;
 
-  if (proxy) {
-    const [ip, port] = proxy.split(':');
-    if (ip && port) {
-      proxyHost = ip.trim();
-      proxyPort = parseInt(port.trim());
+    console.log('Current Proxy:', currentProxy);
+
+    if (currentProxy) {
+      startBot(host, port, currentProxy, botCount, delay);
+      res.send(`Trying to connect bots with proxy: ${currentProxy}`);
+    } else {
+      res.send('All proxies have timed out. No more attempts will be made.');
     }
+  } else {
+    startBot(host, port, null, botCount, delay);
+    res.send(`${botCount} bot(s) starting with no proxy.`);
   }
-
-  startBot(host, port, proxyHost, proxyPort, botCount, delay);
-  res.send(`${botCount} bot(s) starting.`);
 });
 
 // Endpoint to stop the bot(s)
@@ -120,10 +121,7 @@ app.post('/stop-bot', (req, res) => {
     return;
   }
 
-  bots.forEach(bot => {
-    bot.quit('Bot stopped by user');
-    proxyErrorReported = false; // Reset proxy error flag when stopping bots
-  });
+  bots.forEach(bot => bot.quit('Bot stopped by user'));
   bots = [];
   currentProxy = null; // Reset current proxy
   res.send('All bots stopped successfully');
