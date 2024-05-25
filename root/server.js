@@ -11,6 +11,7 @@ const wsPort = 3001;
 const wss = new WebSocket.Server({ port: wsPort });
 
 let bots = [];
+let currentProxyIndex = -1;
 let currentProxy = null;
 
 // Middleware to parse JSON bodies
@@ -46,7 +47,9 @@ function startBot(host, port, proxy, botCount, delay) {
       if (proxy) {
         const [proxyIP, proxyPort] = proxy.split(':');
         const proxyUrl = `socks5://${proxy}`;
-        const agent = new SocksProxyAgent(proxyUrl);
+        const agent = new SocksProxyAgent(proxyUrl, {
+          timeout: 1000 // Timeout set to 1000ms
+        });
         botOptions.agent = agent;
 
         // Override host and port with proxy settings
@@ -71,7 +74,8 @@ function startBot(host, port, proxy, botCount, delay) {
 
         if (err.message.includes('ETIMEDOUT')) {
           // Stop further attempts with this proxy
-          currentProxy = proxy;
+          currentProxyIndex++;
+          currentProxy = null;
         }
       });
 
@@ -97,26 +101,31 @@ app.post('/start-bot', (req, res) => {
     return;
   }
 
-  let proxyToUse = null;
+  // Shuffle the proxy list to choose randomly
+  const shuffledProxyList = shuffleArray(proxyList);
 
-  // Check if a proxy is provided in the request body
-  if (proxyList && proxyList.length > 0) {
-    // Try next proxy if the previous one timed out
-    const availableProxies = proxyList.filter(proxy => proxy !== currentProxy);
-    proxyToUse = availableProxies.length > 0 ? availableProxies[0] : null;
-  }
+  // Choose a random proxy from the list
+  currentProxyIndex = Math.floor(Math.random() * shuffledProxyList.length);
+  currentProxy = shuffledProxyList[currentProxyIndex];
 
-  // If proxy is provided, attempt to connect using proxy
-  if (proxyToUse) {
-    console.log('Trying to connect bots with proxy:', proxyToUse);
-    res.send(`Trying to connect bots with proxy: ${proxyToUse}`);
-    startBot(host, port, proxyToUse, botCount, delay);
+  console.log('Current Proxy:', currentProxy);
+
+  if (currentProxy) {
+    startBot(host, port, currentProxy, botCount, delay);
+    res.send(`Trying to connect bots with proxy: ${currentProxy}`);
   } else {
-    console.log('No proxy available. Connecting bots without proxy.');
-    res.send(`${botCount} bot(s) starting with no proxy.`);
-    startBot(host, port, null, botCount, delay);
+    res.send('No proxies available. Cannot start bots.');
   }
 });
+
+// Function to shuffle an array
+function shuffleArray(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
 
 // Endpoint to stop the bot(s)
 app.post('/stop-bot', (req, res) => {
@@ -132,6 +141,7 @@ app.post('/stop-bot', (req, res) => {
   });
 
   bots = [];
+  currentProxyIndex = -1;
   currentProxy = null; // Reset current proxy
   res.send('All bots stopped successfully');
   broadcast('All bots stopped successfully'); // Broadcast to WebSocket clients
