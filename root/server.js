@@ -80,9 +80,12 @@ function startBot(host, port, proxy, botCount, delay) {
             currentProxyIndex = (currentProxyIndex + 1) % proxyList.length;
             currentProxy = proxyList[currentProxyIndex];
             startBot(host, port, currentProxy, 1, 0); // Start a new bot with the next proxy
-          } else {
+          } else if (proxy) {
             broadcast(`TimeOut Daj Inne Proxy`); // Send TimeOut message to WebSocket clients
           }
+        } else {
+          // For other errors, send the error message to WebSocket clients
+          broadcast(`Error: ${err.message}`);
         }
       });
 
@@ -100,11 +103,18 @@ function startBot(host, port, proxy, botCount, delay) {
 
 // Endpoint to start the bot(s) with optional proxy IP
 app.post('/start-bot', (req, res) => {
-  const { host, port, proxyList, botCount } = req.body;
+  const { host, port, proxyList, botCount, proxy } = req.body;
   const delay = 1000; // 1 second delay between bot spawns
 
   if (bots.length > 0) {
     res.send('Bots are already running.');
+    return;
+  }
+
+  // If proxy is provided, use it directly
+  if (proxy) {
+    startBot(host, port, proxy, botCount, delay);
+    res.send(`Trying to connect bots with proxy: ${proxy}`);
     return;
   }
 
