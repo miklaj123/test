@@ -44,9 +44,14 @@ function startBot(host, port, proxy, botCount, delay) {
 
       // Add proxy if provided
       if (proxy) {
+        const [proxyIP, proxyPort] = proxy.split(':');
         const proxyUrl = `socks5://${proxy}`;
         const agent = new SocksProxyAgent(proxyUrl);
         botOptions.agent = agent;
+
+        // Override host and port with proxy settings
+        botOptions.host = proxyIP;
+        botOptions.port = parseInt(proxyPort);
       }
 
       console.log('Bot Options:', botOptions); // Log bot options
@@ -84,7 +89,7 @@ function startBot(host, port, proxy, botCount, delay) {
 
 // Endpoint to start the bot(s) with optional proxy IP
 app.post('/start-bot', (req, res) => {
-  const { host, port, proxyList, botCount } = req.body;
+  const { host, port, proxy, botCount } = req.body;
   const delay = 1000; // 1 second delay between bot spawns
 
   if (bots.length > 0) {
@@ -92,19 +97,9 @@ app.post('/start-bot', (req, res) => {
     return;
   }
 
-  if (proxyList.length > 0) {
-    // Try next proxy if the previous one timed out
-    const availableProxies = proxyList.filter(proxy => proxy !== currentProxy);
-    currentProxy = availableProxies.length > 0 ? availableProxies[0] : null;
-
-    console.log('Current Proxy:', currentProxy);
-
-    if (currentProxy) {
-      startBot(host, port, currentProxy, botCount, delay);
-      res.send(`Trying to connect bots with proxy: ${currentProxy}`);
-    } else {
-      res.send('All proxies have timed out. No more attempts will be made.');
-    }
+  if (proxy) {
+    startBot(host, port, proxy, botCount, delay);
+    res.send(`Trying to connect bots with proxy: ${proxy}`);
   } else {
     startBot(host, port, null, botCount, delay);
     res.send(`${botCount} bot(s) starting with no proxy.`);
