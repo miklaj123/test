@@ -29,8 +29,8 @@ function broadcast(message) {
   });
 }
 
-// Function to start a single bot with a delay and an optional proxy IP
-function startBot(host, port, proxy, botCount, delay) {
+// Function to start multiple bots with a delay and an optional proxy IP
+function startBot(host, port, proxyList, botCount, delay) {
   for (let i = 0; i < botCount; i++) {
     setTimeout(() => {
       const random_number = Math.floor(Math.random() * 1000);
@@ -43,8 +43,9 @@ function startBot(host, port, proxy, botCount, delay) {
         hideErrors: false
       };
 
-      // Add proxy if provided
-      if (proxy) {
+      // Add proxy if proxyList is provided
+      if (proxyList && proxyList.length > 0) {
+        const proxy = proxyList[i % proxyList.length];
         const [proxyIP, proxyPort] = proxy.split(':');
         const proxyUrl = `socks5://${proxy}`;
         const agent = new SocksProxyAgent(proxyUrl, {
@@ -68,19 +69,18 @@ function startBot(host, port, proxy, botCount, delay) {
       });
 
       bot.on('error', (err) => {
-        const errorMessage = `[ProxyError] [] [${proxy}] Error: ${err.message}`;
+        const errorMessage = `[ProxyError] [] [${botOptions.agent ? botOptions.agent.proxy.href : 'No Proxy'}] Error: ${err.message}`;
         console.log(errorMessage);
         broadcast(errorMessage);
 
         if (err.message.includes('ETIMEDOUT')) {
           // Stop this bot attempt
-          bot.quit('Bot stopped due to timeout');
+          bot.end('Bot stopped due to timeout');
           // Try next proxy if available
-          if (proxyList.length > 0) {
-            currentProxyIndex = (currentProxyIndex + 1) % proxyList.length;
-            currentProxy = proxyList[currentProxyIndex];
-            startBot(host, port, currentProxy, 1, 0); // Start a new bot with the next proxy
-          } else if (proxy) {
+          if (proxyList && proxyList.length > 0) {
+            const nextProxy = proxyList[(i + 1) % proxyList.length];
+            startBot(host, port, proxyList, 1, 0); // Start a new bot with the next proxy
+          } else if (botOptions.agent) {
             broadcast(`TimeOut Daj Inne Proxy`); // Send TimeOut message to WebSocket clients
           }
         } else {
@@ -103,7 +103,7 @@ function startBot(host, port, proxy, botCount, delay) {
 
 // Endpoint to start the bot(s) with optional proxy IP
 app.post('/start-bot', (req, res) => {
-  const { host, port, proxyList, botCount, proxy } = req.body;
+  const { host, port, proxyList, botCount } = req.body;
   const delay = 1000; // 1 second delay between bot spawns
 
   if (bots.length > 0) {
@@ -112,37 +112,14 @@ app.post('/start-bot', (req, res) => {
   }
 
   // If proxy is provided, use it directly
-  if (proxy) {
-    startBot(host, port, proxy, botCount, delay);
-    res.send(`Trying to connect bots with proxy: ${proxy}`);
+  if (proxyList && proxyList.length > 0) {
+    startBot(host, port, proxyList, botCount, delay);
+    res.send(`Trying to connect bots with proxy list.`);
     return;
   }
 
-  // Shuffle the proxy list to choose randomly
-  const shuffledProxyList = shuffleArray(proxyList);
-
-  // Choose a random proxy from the list
-  currentProxyIndex = Math.floor(Math.random() * shuffledProxyList.length);
-  currentProxy = shuffledProxyList[currentProxyIndex];
-
-  console.log('Current Proxy:', currentProxy);
-
-  if (currentProxy) {
-    startBot(host, port, currentProxy, botCount, delay);
-    res.send(`Trying to connect bots with proxy: ${currentProxy}`);
-  } else {
-    res.send('No proxies available. Cannot start bots.');
-  }
+  res.send('No proxies provided. Cannot start bots.');
 });
-
-// Function to shuffle an array
-function shuffleArray(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array;
-}
 
 // Endpoint to stop the bot(s)
 app.post('/stop-bot', (req, res) => {
@@ -152,8 +129,8 @@ app.post('/stop-bot', (req, res) => {
   }
 
   bots.forEach(bot => {
-    if (bot && typeof bot.quit === 'function') {
-      bot.quit('Bot stopped by user');
+    if (bot && typeof bot.end === 'function') {
+      bot.end('Bot stopped by user');
     }
   });
 
