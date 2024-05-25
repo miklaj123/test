@@ -44,12 +44,9 @@ function startBot(host, port, proxy, botCount, delay) {
 
       // Add proxy if provided
       if (proxy) {
-        botOptions = {
-          ...botOptions,
-          // Use proxy for bot connection
-          socksPort: proxy.split(':')[1], // assuming proxy format is IP:Port
-          proxy: proxy.split(':')[0] // assuming proxy format is IP:Port
-        };
+        const proxyUrl = `socks5://${proxy}`;
+        const agent = new SocksProxyAgent(proxyUrl);
+        botOptions.agent = agent;
       }
 
       console.log('Bot Options:', botOptions); // Log bot options
@@ -121,10 +118,16 @@ app.post('/stop-bot', (req, res) => {
     return;
   }
 
-  bots.forEach(bot => bot.quit('Bot stopped by user'));
+  bots.forEach(bot => {
+    if (bot && typeof bot.quit === 'function') {
+      bot.quit('Bot stopped by user');
+    }
+  });
+
   bots = [];
   currentProxy = null; // Reset current proxy
   res.send('All bots stopped successfully');
+  broadcast('All bots stopped successfully'); // Broadcast to WebSocket clients
 });
 
 app.listen(port, () => {
