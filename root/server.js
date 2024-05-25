@@ -6,9 +6,7 @@ const WebSocket = require('ws');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 
 const app = express();
-const port = 3000;
-const wsPort = 3001;
-const wss = new WebSocket.Server({ port: wsPort });
+const PORT = process.env.PORT || 3000;
 
 let bots = [];
 let currentProxy = null;
