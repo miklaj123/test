@@ -71,7 +71,7 @@ function startBot(host, port, proxy, botCount, delay) {
 
         if (err.message.includes('ETIMEDOUT')) {
           // Stop further attempts with this proxy
-          currentProxy = null;
+          currentProxy = proxy;
         }
       });
 
@@ -89,7 +89,7 @@ function startBot(host, port, proxy, botCount, delay) {
 
 // Endpoint to start the bot(s) with optional proxy IP
 app.post('/start-bot', (req, res) => {
-  const { host, port, proxy, botCount } = req.body;
+  const { host, port, proxyList, botCount } = req.body;
   const delay = 1000; // 1 second delay between bot spawns
 
   if (bots.length > 0) {
@@ -97,12 +97,24 @@ app.post('/start-bot', (req, res) => {
     return;
   }
 
-  if (proxy) {
-    startBot(host, port, proxy, botCount, delay);
-    res.send(`Trying to connect bots with proxy: ${proxy}`);
+  let proxyToUse = null;
+
+  // Check if a proxy is provided in the request body
+  if (proxyList && proxyList.length > 0) {
+    // Try next proxy if the previous one timed out
+    const availableProxies = proxyList.filter(proxy => proxy !== currentProxy);
+    proxyToUse = availableProxies.length > 0 ? availableProxies[0] : null;
+  }
+
+  // If proxy is provided, attempt to connect using proxy
+  if (proxyToUse) {
+    console.log('Trying to connect bots with proxy:', proxyToUse);
+    res.send(`Trying to connect bots with proxy: ${proxyToUse}`);
+    startBot(host, port, proxyToUse, botCount, delay);
   } else {
-    startBot(host, port, null, botCount, delay);
+    console.log('No proxy available. Connecting bots without proxy.');
     res.send(`${botCount} bot(s) starting with no proxy.`);
+    startBot(host, port, null, botCount, delay);
   }
 });
 
