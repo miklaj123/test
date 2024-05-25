@@ -48,7 +48,7 @@ function startBot(host, port, proxy, botCount, delay) {
         const [proxyIP, proxyPort] = proxy.split(':');
         const proxyUrl = `socks5://${proxy}`;
         const agent = new SocksProxyAgent(proxyUrl, {
-          timeout: 1000 // Timeout set to 1000ms
+          timeout: 1000 // Global timeout set to 1000ms
         });
         botOptions.agent = agent;
 
@@ -73,9 +73,16 @@ function startBot(host, port, proxy, botCount, delay) {
         broadcast(errorMessage);
 
         if (err.message.includes('ETIMEDOUT')) {
-          // Stop further attempts with this proxy
-          currentProxyIndex++;
-          currentProxy = null;
+          // Stop this bot attempt
+          bot.quit('Bot stopped due to timeout');
+          // Try next proxy if available
+          if (proxyList.length > 0) {
+            currentProxyIndex = (currentProxyIndex + 1) % proxyList.length;
+            currentProxy = proxyList[currentProxyIndex];
+            startBot(host, port, currentProxy, 1, 0); // Start a new bot with the next proxy
+          } else {
+            broadcast(`TimeOut Daj Inne Proxy`); // Send TimeOut message to WebSocket clients
+          }
         }
       });
 
