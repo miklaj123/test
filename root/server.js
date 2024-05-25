@@ -69,10 +69,6 @@ function startBot(host, port, proxyList, botCount, delay) {
       });
 
       bot.on('error', (err) => {
-        const errorMessage = `[ProxyError] [] [${botOptions.agent ? botOptions.agent.proxy.href : 'No Proxy'}] Error: ${err.message}`;
-        console.log(errorMessage);
-        broadcast(errorMessage);
-
         if (err.message.includes('ETIMEDOUT')) {
           // Stop this bot attempt
           bot.end('Bot stopped due to timeout');
@@ -81,7 +77,8 @@ function startBot(host, port, proxyList, botCount, delay) {
             const nextProxy = proxyList[(i + 1) % proxyList.length];
             startBot(host, port, proxyList, 1, 0); // Start a new bot with the next proxy
           } else if (botOptions.agent) {
-            broadcast(`TimeOut Daj Inne Proxy`); // Send TimeOut message to WebSocket clients
+            const proxy = botOptions.agent.proxy.href;
+            broadcast(`TimeOut - ${proxy}`); // Send TimeOut message with proxy to WebSocket clients
           }
         } else {
           // For other errors, send the error message to WebSocket clients
