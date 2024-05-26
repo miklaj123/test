@@ -111,11 +111,12 @@ app.post('/start-bot', (req, res) => {
   // If proxy is provided, use it directly
   if (proxyList && proxyList.length > 0) {
     startBot(host, port, proxyList, botCount, delay);
-    res.send(`Trying to connect bots with proxy list.`);
+    res.send('Trying to connect bots with proxy list.');
     return;
   }
 
-  res.send('No proxies provided. Cannot start bots.');
+  startBot(host, port, [], botCount, delay); // Start bots without proxies if no proxy list is provided
+  res.send('Starting bots without proxies.');
 });
 
 // Endpoint to stop the bot(s)
