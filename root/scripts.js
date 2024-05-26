@@ -4,12 +4,14 @@ document.getElementById('startBot').addEventListener('click', () => {
   const proxyFile = document.getElementById('proxyFile').files[0];
   const botCount = document.getElementById('botCount').value;
 
-  // Read the proxy file if provided
+  let proxyList = null;
+
+  // Sprawdź, czy plik proxy został dostarczony
   if (proxyFile) {
     const reader = new FileReader();
 
     reader.onload = () => {
-      const proxyList = reader.result.split('\n').map(line => line.trim());
+      proxyList = reader.result.split('\n').map(line => line.trim());
       startBot(host, port, proxyList, botCount);
     };
 
@@ -26,17 +28,17 @@ document.getElementById('stopBot').addEventListener('click', () => {
       console.log(message);
       document.getElementById('log').value += message + '\n';
     })
-    .catch(error => console.error('Error stopping bots:', error));
+    .catch(error => console.error('Błąd podczas zatrzymywania botów:', error));
 });
 
 const ws = new WebSocket(`ws://localhost:${wsPort}`);
 
 ws.onopen = () => {
-  console.log('WebSocket connection established.');
+  console.log('Nawiązano połączenie przez WebSocket.');
 };
 
 ws.onmessage = (event) => {
   const message = event.data;
-  console.log('Received message from server:', message);
+  console.log('Otrzymano wiadomość od serwera:', message);
   document.getElementById('log').value += message + '\n';
 };
