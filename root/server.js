@@ -14,8 +14,9 @@ let bots = [];
 let currentProxyIndex = -1;
 let currentProxy = null;
 
-// Middleware to parse JSON bodies with a higher limit (500MB)
+// Middleware to parse JSON and urlencoded bodies with a higher limit (500MB)
 app.use(bodyParser.json({ limit: '500mb' }));
+app.use(bodyParser.urlencoded({ limit: '500mb', extended: true }));
 
 // Serve the index.html file and other static files (like styles.css)
 app.use(express.static(path.join(__dirname)));
