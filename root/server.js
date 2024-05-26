@@ -4,23 +4,24 @@ const express = require('express');
 const mineflayer = require('mineflayer');
 const path = require('path');
 const bodyParser = require('body-parser');
+const http = require('http');
 const WebSocket = require('ws');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 
 const app = express();
-const port = 3000;
-const wsPort = 3001;
-const wss = new WebSocket.Server({ port: wsPort });
+const port = process.env.PORT || 3000; // Ustawia port na zmiennej środowiskowej PORT lub 3000
+const wsPort = process.env.WS_PORT || 3001; // Ustawia port WebSocket na zmiennej środowiskowej WS_PORT lub 3001
+const server = http.createServer(app); // Tworzy serwer HTTP z aplikacją Express
+const wss = new WebSocket.Server({ server }); // Korzysta z serwera HTTP do obsługi WebSocket
 
 let bots = [];
 
-// Middleware to parse JSON bodies
+// Middleware do parsowania JSON
 app.use(bodyParser.json({ limit: '500mb' }));
-
-// Serve the index.html file and other static files (like styles.css)
+// Serwuje pliki statyczne, w tym index.html, styles.css i scripts.js
 app.use(express.static(path.join(__dirname)));
 
-// Function to broadcast a message to all WebSocket clients
+// Funkcja do rozgłaszania wiadomości do wszystkich klientów WebSocket
 function broadcastToClients(message) {
   wss.clients.forEach(client => {
     if (client.readyState === WebSocket.OPEN) {
@@ -29,7 +30,7 @@ function broadcastToClients(message) {
   });
 }
 
-// Function to start multiple bots with a delay and an optional proxy IP
+// Funkcja do uruchamiania wielu botów z opóźnieniem i opcjonalnym adresem proxy
 function startBot(host, port, proxyList, botCount, delay) {
   for (let i = 0; i < botCount; i++) {
     setTimeout(() => {
@@ -38,105 +39,102 @@ function startBot(host, port, proxyList, botCount, delay) {
 
       let botOptions = {
         host: host,
-        port: port ? parseInt(port) : 25565, // Default port is 25565
+        port: port ? parseInt(port) : 25565,
         username: BOT_USERNAME,
         hideErrors: false
       };
 
       let proxy = null;
 
-      // Add proxy if proxyList is provided
       if (proxyList && proxyList.length > 0) {
         proxy = proxyList[i % proxyList.length];
         const proxyUrl = `socks5://${proxy}`;
         const agent = new SocksProxyAgent(proxyUrl, {
-          timeout: 1000 // Global timeout set to 1000ms
+          timeout: 1000
         });
         botOptions.agent = agent;
       }
 
-      console.log('Bot Options:', botOptions); // Log bot options
-
       const bot = mineflayer.createBot(botOptions);
 
       bot.once('login', () => {
-        const message = ``;
-    broadcastToClients(message);
+        const message = `→ Bot ${BOT_USERNAME} Connected`;
+        broadcastToClients(message);
       });
-	  bot.once('login', () => {
-		const message = `→ Connect ${BOT_USERNAME} Proxy - ${proxy}`;
-			broadcastToClients(message);
-	  });
-	  bot.once('error', () => {
-        const message = ``;
-    broadcastToClients(message);
-      });
-      bot.on('error', (err) => {
-        broadcastToClients(`✉︎ Error: ${err.message}`);
-      });
-	  bot.once('end', () => {
-        const message = ``;
-    broadcastToClients(message);
-	  });
 
-      bot.on('end', () => {
-        const message = `← Disconnect ${BOT_USERNAME} Proxy - ${proxy}`;
+      bot.once('error', () => {
+        const message = `✉︎ Error: Bot ${BOT_USERNAME}`;
+        broadcastToClients(message);
+      });
+
+      bot.on('error', (err) => {
+        const message = `✉︎ Error: ${err.message}`;
+        broadcastToClients(message);
+      });
+
+      bot.once('end', () => {
+        const message = `← Bot ${BOT_USERNAME} Disconnected`;
         console.log(message);
         broadcastToClients(message);
-        bots = bots.filter(b => b !== bot); // Remove bot from the array when it ends
+        bots = bots.filter(b => b !== bot);
+      });
+
+      bot.on('end', () => {
+        const message = `← Bot ${BOT_USERNAME} Disconnected`;
+        console.log(message);
+        broadcastToClients(message);
+        bots = bots.filter(b => b !== bot);
       });
 
       bots.push(bot);
-    }, i * delay); // Delay each bot spawn
+    }, i * delay);
   }
 }
 
-// Endpoint to start the bot(s) with optional proxy IP
+// Endpoint do uruchamiania botów
 app.post('/start-bot', (req, res) => {
   const { host, port, proxyList, botCount } = req.body;
-  const delay = 1000; // 1 second delay between bot spawns
+  const delay = 1000;
 
   if (bots.length > 0) {
-	  res.send('');
-    res.send('✉︎ Bots Is Runing');
+    res.send('✉︎ Bots are already running');
     return;
   }
 
-  // If proxy is provided, use it directly
   if (proxyList && proxyList.length > 0) {
     startBot(host, port, proxyList, botCount, delay);
-	broadcastToClients(``);
-    broadcastToClients(`✉︎ Bots Trying To Connect.`);
+    broadcastToClients('✉︎ Bots trying to connect...');
+    res.send('');
     return;
   }
-  res.send(``);
-  res.send('✉︎ Add Proxy To Start.');
+
+  res.send('✉︎ Add proxy to start');
 });
 
-// Endpoint to stop the bot(s)
+// Endpoint do zatrzymywania botów
 app.post('/stop-bot', (req, res) => {
   if (bots.length === 0) {
-	res.send(``);
-    res.send('✉︎ No Bot Is Runing.');
+    res.send('✉︎ No bot is running');
     return;
   }
 
   bots.forEach(bot => {
     if (bot && typeof bot.end === 'function') {
-	  bot.end(``);
-      bot.end('✉︎ Bots Stoped');
+      bot.end('✉︎ Bots stopped');
     }
   });
 
   bots = [];
-  broadcastToClients('');
-  broadcastToClients('✉︎ All Bots Has Stoped'); // Broadcast to WebSocket clients
+  broadcastToClients('✉︎ All bots have stopped');
+  res.send('');
 });
 
-app.listen(port, () => {
-  console.log(`✉︎ Server is running on http://localhost:${port}`);
+// Serwer HTTP nasłuchuje na odpowiednim porcie
+server.listen(port, () => {
+  console.log(`Server is running on http://localhost:${port}`);
 });
 
+// Serwer WebSocket nasłuchuje na odpowiednim porcie
 wss.on('connection', (ws) => {
-  ws.send('✉︎ You Connect To Bot Sender');
+  ws.send('✉︎ You are connected to bot sender');
 });
