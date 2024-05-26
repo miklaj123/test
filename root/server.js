@@ -11,8 +11,6 @@ const wsPort = 3001;
 const wss = new WebSocket.Server({ port: wsPort });
 
 let bots = [];
-let currentProxyIndex = -1;
-let currentProxy = null;
 
 // Middleware to parse JSON bodies
 app.use(bodyParser.json({ limit: '500mb' }));
@@ -135,8 +133,6 @@ app.post('/stop-bot', (req, res) => {
   });
 
   bots = [];
-  currentProxyIndex = -1;
-  currentProxy = null; // Reset current proxy
   res.send('All bots stopped successfully');
   broadcast('All bots stopped successfully'); // Broadcast to WebSocket clients
 });

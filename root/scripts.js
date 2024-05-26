@@ -7,61 +7,36 @@ document.getElementById('startBot').addEventListener('click', () => {
   // Read the proxy file if provided
   if (proxyFile) {
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const proxyList = e.target.result.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-      fetch('/start-bot', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          host,
-          port,
-          proxyList,
-          botCount: parseInt(botCount),
-        }),
-      }).then(response => response.text()).then(data => {
-        console.log(data);
-        logMessage(data);
-      });
+
+    reader.onload = () => {
+      const proxyList = reader.result.split('\n').map(line => line.trim());
+      startBot(host, port, proxyList, botCount);
     };
+
     reader.readAsText(proxyFile);
   } else {
-    fetch('/start-bot', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        host,
-        port,
-        botCount: parseInt(botCount),
-      }),
-    }).then(response => response.text()).then(data => {
-      console.log(data);
-      logMessage(data);
-    });
+    startBot(host, port, null, botCount);
   }
 });
 
 document.getElementById('stopBot').addEventListener('click', () => {
-  fetch('/stop-bot', {
-    method: 'POST',
-  }).then(response => response.text()).then(data => {
-    console.log(data);
-    logMessage(data);
-  });
+  fetch('/stop-bot', { method: 'POST' })
+    .then(response => response.text())
+    .then(message => {
+      console.log(message);
+      document.getElementById('log').value += message + '\n';
+    })
+    .catch(error => console.error('Error stopping bots:', error));
 });
 
-// Function to log messages to the textarea
-function logMessage(message) {
-  const log = document.getElementById('log');
-  log.value += message + '\n';
-  log.scrollTop = log.scrollHeight;
-}
+const ws = new WebSocket(`ws://localhost:${wsPort}`);
 
-// Setup WebSocket to receive real-time messages
-const ws = new WebSocket(`ws://${window.location.hostname}:3001`);
+ws.onopen = () => {
+  console.log('WebSocket connection established.');
+};
+
 ws.onmessage = (event) => {
-  logMessage(event.data);
+  const message = event.data;
+  console.log('Received message from server:', message);
+  document.getElementById('log').value += message + '\n';
 };
