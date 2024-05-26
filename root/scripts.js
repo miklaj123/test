@@ -4,41 +4,64 @@ document.getElementById('startBot').addEventListener('click', () => {
   const proxyFile = document.getElementById('proxyFile').files[0];
   const botCount = document.getElementById('botCount').value;
 
-  let proxyList = null;
-
-  // Sprawdź, czy plik proxy został dostarczony
+  // Read the proxy file if provided
   if (proxyFile) {
     const reader = new FileReader();
-
-    reader.onload = () => {
-      proxyList = reader.result.split('\n').map(line => line.trim());
-      startBot(host, port, proxyList, botCount);
+    reader.onload = (e) => {
+      const proxyList = e.target.result.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+      fetch('/start-bot', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          host,
+          port,
+          proxyList,
+          botCount: parseInt(botCount),
+        }),
+      }).then(response => response.text()).then(data => {
+        console.log(data);
+        logMessage(data);
+      });
     };
-
     reader.readAsText(proxyFile);
   } else {
-    startBot(host, port, null, botCount);
+    fetch('/start-bot', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        host,
+        port,
+        botCount: parseInt(botCount),
+      }),
+    }).then(response => response.text()).then(data => {
+      console.log(data);
+      logMessage(data);
+    });
   }
 });
 
 document.getElementById('stopBot').addEventListener('click', () => {
-  fetch('/stop-bot', { method: 'POST' })
-    .then(response => response.text())
-    .then(message => {
-      console.log(message);
-      document.getElementById('log').value += message + '\n';
-    })
-    .catch(error => console.error('Błąd podczas zatrzymywania botów:', error));
+  fetch('/stop-bot', {
+    method: 'POST',
+  }).then(response => response.text()).then(data => {
+    console.log(data);
+    logMessage(data);
+  });
 });
 
-const ws = new WebSocket(`ws://localhost:${wsPort}`);
+// Function to log messages to the textarea
+function logMessage(message) {
+  const log = document.getElementById('log');
+  log.value += message + '\n';
+  log.scrollTop = log.scrollHeight;
+}
 
-ws.onopen = () => {
-  console.log('Nawiązano połączenie przez WebSocket.');
-};
-
+// Setup WebSocket to receive real-time messages
+const ws = new WebSocket(`ws://${window.location.hostname}:3001`);
 ws.onmessage = (event) => {
-  const message = event.data;
-  console.log('Otrzymano wiadomość od serwera:', message);
-  document.getElementById('log').value += message + '\n';
+  logMessage(event.data);
 };
