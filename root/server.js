@@ -43,9 +43,11 @@ function startBot(host, port, proxyList, botCount, delay) {
         hideErrors: false
       };
 
+      let proxy = null;
+
       // Add proxy if proxyList is provided
       if (proxyList && proxyList.length > 0) {
-        const proxy = proxyList[i % proxyList.length];
+        proxy = proxyList[i % proxyList.length];
         const proxyUrl = `socks5://${proxy}`;
         const agent = new SocksProxyAgent(proxyUrl, {
           timeout: 1000 // Global timeout set to 1000ms
@@ -61,6 +63,12 @@ function startBot(host, port, proxyList, botCount, delay) {
         const message = `Bot ${BOT_USERNAME} spawned and logged in.`;
         console.log(message);
         broadcast(message);
+
+        if (proxy) {
+          // Send a message in-game with the bot's username and the proxy it is using
+          const inGameMessage = `${BOT_USERNAME}: Proxy - ${proxy}`;
+          bot.chat(inGameMessage);
+        }
       });
 
       bot.on('error', (err) => {

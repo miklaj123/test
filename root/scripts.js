@@ -22,6 +22,7 @@ document.getElementById('startBot').addEventListener('click', () => {
         }),
       }).then(response => response.text()).then(data => {
         console.log(data);
+        logMessage(data);
       });
     };
     reader.readAsText(proxyFile);
@@ -38,6 +39,7 @@ document.getElementById('startBot').addEventListener('click', () => {
       }),
     }).then(response => response.text()).then(data => {
       console.log(data);
+      logMessage(data);
     });
   }
 });
@@ -47,5 +49,19 @@ document.getElementById('stopBot').addEventListener('click', () => {
     method: 'POST',
   }).then(response => response.text()).then(data => {
     console.log(data);
+    logMessage(data);
   });
 });
+
+// Function to log messages to the textarea
+function logMessage(message) {
+  const log = document.getElementById('log');
+  log.value += message + '\n';
+  log.scrollTop = log.scrollHeight;
+}
+
+// Setup WebSocket to receive real-time messages
+const ws = new WebSocket(`ws://${window.location.hostname}:3001`);
+ws.onmessage = (event) => {
+  logMessage(event.data);
+};
