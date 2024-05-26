@@ -14,9 +14,8 @@ let bots = [];
 let currentProxyIndex = -1;
 let currentProxy = null;
 
-// Middleware to parse JSON and urlencoded bodies with a higher limit (500MB)
+// Middleware to parse JSON bodies
 app.use(bodyParser.json({ limit: '500mb' }));
-app.use(bodyParser.urlencoded({ limit: '500mb', extended: true }));
 
 // Serve the index.html file and other static files (like styles.css)
 app.use(express.static(path.join(__dirname)));
@@ -47,16 +46,11 @@ function startBot(host, port, proxyList, botCount, delay) {
       // Add proxy if proxyList is provided
       if (proxyList && proxyList.length > 0) {
         const proxy = proxyList[i % proxyList.length];
-        const [proxyIP, proxyPort] = proxy.split(':');
         const proxyUrl = `socks5://${proxy}`;
         const agent = new SocksProxyAgent(proxyUrl, {
           timeout: 1000 // Global timeout set to 1000ms
         });
         botOptions.agent = agent;
-
-        // Override host and port with proxy settings
-        botOptions.host = proxyIP;
-        botOptions.port = parseInt(proxyPort);
       }
 
       console.log('Bot Options:', botOptions); // Log bot options
@@ -112,12 +106,11 @@ app.post('/start-bot', (req, res) => {
   // If proxy is provided, use it directly
   if (proxyList && proxyList.length > 0) {
     startBot(host, port, proxyList, botCount, delay);
-    res.send('Trying to connect bots with proxy list.');
+    res.send(`Trying to connect bots with proxy list.`);
     return;
   }
 
-  startBot(host, port, [], botCount, delay); // Start bots without proxies if no proxy list is provided
-  res.send('Starting bots without proxies.');
+  res.send('No proxies provided. Cannot start bots.');
 });
 
 // Endpoint to stop the bot(s)
