@@ -1,3 +1,5 @@
+// server.js
+
 const express = require('express');
 const mineflayer = require('mineflayer');
 const path = require('path');
@@ -11,8 +13,6 @@ const wsPort = 3001;
 const wss = new WebSocket.Server({ port: wsPort });
 
 let bots = [];
-let currentProxyIndex = -1;
-let currentProxy = null;
 
 // Middleware to parse JSON bodies
 app.use(bodyParser.json({ limit: '500mb' }));
@@ -21,7 +21,7 @@ app.use(bodyParser.json({ limit: '500mb' }));
 app.use(express.static(path.join(__dirname)));
 
 // Function to broadcast a message to all WebSocket clients
-function broadcast(message) {
+function broadcastToClients(message) {
   wss.clients.forEach(client => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(message);
@@ -34,7 +34,7 @@ function startBot(host, port, proxyList, botCount, delay) {
   for (let i = 0; i < botCount; i++) {
     setTimeout(() => {
       const random_number = Math.floor(Math.random() * 1000);
-      const BOT_USERNAME = `colab_${random_number}_${i}`;
+      const BOT_USERNAME = `${random_number}_${i}`;
 
       let botOptions = {
         host: host,
@@ -60,39 +60,29 @@ function startBot(host, port, proxyList, botCount, delay) {
       const bot = mineflayer.createBot(botOptions);
 
       bot.once('login', () => {
-        const message = `Bot ${BOT_USERNAME} spawned and logged in.`;
-        console.log(message);
-        broadcast(message);
-
-        if (proxy) {
-          // Send a message in-game with the bot's username and the proxy it is using
-          const inGameMessage = `${BOT_USERNAME}: Proxy - ${proxy}`;
-          bot.chat(inGameMessage);
-        }
+        const message = ``;
+    broadcastToClients(message);
       });
-
+	  bot.once('login', () => {
+		const message = `→ Connect ${BOT_USERNAME} Proxy - ${proxy}`;
+			broadcastToClients(message);
+	  });
+	  bot.once('error', () => {
+        const message = ``;
+    broadcastToClients(message);
+      });
       bot.on('error', (err) => {
-        if (err.message.includes('ETIMEDOUT')) {
-          // Stop this bot attempt
-          bot.end('Bot stopped due to timeout');
-          // Try next proxy if available
-          if (proxyList && proxyList.length > 0) {
-            const nextProxy = proxyList[(i + 1) % proxyList.length];
-            startBot(host, port, proxyList, 1, 0); // Start a new bot with the next proxy
-          } else if (botOptions.agent) {
-            const proxy = botOptions.agent.proxy.href;
-            broadcast(`TimeOut - ${proxy}`); // Send TimeOut message with proxy to WebSocket clients
-          }
-        } else {
-          // For other errors, send the error message to WebSocket clients
-          broadcast(`Error: ${err.message}`);
-        }
+        broadcastToClients(`✉︎ Error: ${err.message}`);
       });
+	  bot.once('end', () => {
+        const message = ``;
+    broadcastToClients(message);
+	  });
 
       bot.on('end', () => {
-        const message = `Bot ${BOT_USERNAME} has ended.`;
+        const message = `← Disconnect ${BOT_USERNAME} Proxy - ${proxy}`;
         console.log(message);
-        broadcast(message);
+        broadcastToClients(message);
         bots = bots.filter(b => b !== bot); // Remove bot from the array when it ends
       });
 
@@ -107,44 +97,46 @@ app.post('/start-bot', (req, res) => {
   const delay = 1000; // 1 second delay between bot spawns
 
   if (bots.length > 0) {
-    res.send('Bots are already running.');
+	  res.send('');
+    res.send('✉︎ Bots Is Runing');
     return;
   }
 
   // If proxy is provided, use it directly
   if (proxyList && proxyList.length > 0) {
     startBot(host, port, proxyList, botCount, delay);
-    res.send(`Trying to connect bots with proxy list.`);
+	broadcastToClients(``);
+    broadcastToClients(`✉︎ Bots Trying To Connect.`);
     return;
   }
-
-  res.send('No proxies provided. Cannot start bots.');
+  res.send(``);
+  res.send('✉︎ Add Proxy To Start.');
 });
 
 // Endpoint to stop the bot(s)
 app.post('/stop-bot', (req, res) => {
   if (bots.length === 0) {
-    res.send('No bots are running.');
+	res.send(``);
+    res.send('✉︎ No Bot Is Runing.');
     return;
   }
 
   bots.forEach(bot => {
     if (bot && typeof bot.end === 'function') {
-      bot.end('Bot stopped by user');
+	  bot.end(``);
+      bot.end('✉︎ Bots Stoped');
     }
   });
 
   bots = [];
-  currentProxyIndex = -1;
-  currentProxy = null; // Reset current proxy
-  res.send('All bots stopped successfully');
-  broadcast('All bots stopped successfully'); // Broadcast to WebSocket clients
+  broadcastToClients('');
+  broadcastToClients('✉︎ All Bots Has Stoped'); // Broadcast to WebSocket clients
 });
 
 app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+  console.log(`✉︎ Server is running on http://localhost:${port}`);
 });
 
 wss.on('connection', (ws) => {
-  ws.send('WebSocket connection established.');
+  ws.send('✉︎ You Connect To Bot Sender');
 });
