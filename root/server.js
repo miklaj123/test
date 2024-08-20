@@ -6,7 +6,7 @@ const path = require('path');
 const bodyParser = require('body-parser');
 const http = require('http');
 const WebSocket = require('ws');
-const { SocksProxyAgent } = require('socks-proxy-agent'); // Import SocksProxyAgent correctly
+const { SocksProxyAgent } = require('socks-proxy-agent');
 const net = require('net');
 
 const app = express();
@@ -27,12 +27,11 @@ function broadcastToClients(message) {
   });
 }
 
-// Function to ping proxy
 function pingProxy(proxy, callback) {
   const [host, port] = proxy.split(':');
   const socket = new net.Socket();
 
-  socket.setTimeout(3000); // 3-second timeout
+  socket.setTimeout(3000);
 
   socket.on('connect', () => {
     socket.destroy();
@@ -57,7 +56,7 @@ function startBot(host, port, proxyList, botCount, delay) {
         port: port ? parseInt(port) : 25565,
         username: BOT_USERNAME,
         hideErrors: false,
-        version: '1.20.1' // Set Minecraft version
+        version: '1.20.1'
       };
 
       if (proxyList && proxyList.length > 0) {
@@ -66,11 +65,13 @@ function startBot(host, port, proxyList, botCount, delay) {
           if (isAlive) {
             const proxyUrl = `socks5://${proxy}`;
             try {
-              const agent = new SocksProxyAgent(proxyUrl); // Correct usage of SocksProxyAgent
-              botOptions.agent = agent;
-              botOptions.proxyAddress = proxy; // Save proxy address
+              const agent = new SocksProxyAgent(proxyUrl);
+
+              // Create bot with custom createBot to inject agent
+              const bot = createBotWithAgent(botOptions, agent);
+
               console.log(`→ Bot ${BOT_USERNAME} will try to connect through proxy ${proxy}`);
-              connectBot(botOptions, BOT_USERNAME);
+              connectBot(bot, BOT_USERNAME, proxy);
             } catch (error) {
               console.error(`Error creating SocksProxyAgent: ${error.message}`);
               broadcastToClients(`✉︎ Error creating SocksProxyAgent: ${error.message}`);
@@ -83,18 +84,26 @@ function startBot(host, port, proxyList, botCount, delay) {
         });
       } else {
         console.log(`→ Bot ${BOT_USERNAME} will try to connect without proxy`);
-        connectBot(botOptions, BOT_USERNAME);
+        const bot = createBotWithAgent(botOptions, null);
+        connectBot(bot, BOT_USERNAME, 'No proxy');
       }
     }, i * delay);
   }
 }
 
-function connectBot(botOptions, BOT_USERNAME) {
-  try {
-    const bot = mineflayer.createBot(botOptions);
+function createBotWithAgent(botOptions, agent) {
+  // Custom createBot function to ensure agent is applied
+  const bot = mineflayer.createBot({
+    ...botOptions,
+    agent: agent, // Inject agent here
+  });
+  return bot;
+}
 
+function connectBot(bot, BOT_USERNAME, proxyAddress) {
+  try {
     bot.once('login', () => {
-      const message = `→ Bot ${BOT_USERNAME} Connected through proxy ${botOptions.proxyAddress || 'No proxy'}`;
+      const message = `→ Bot ${BOT_USERNAME} Connected through proxy ${proxyAddress}`;
       console.log(message);
       broadcastToClients(message);
     });
