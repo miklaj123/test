@@ -6,7 +6,7 @@ const path = require('path');
 const bodyParser = require('body-parser');
 const http = require('http');
 const WebSocket = require('ws');
-const { SocksProxyAgent } = require('socks-proxy-agent');
+const SocksProxyAgent = require('socks-proxy-agent'); // Import SocksProxyAgent
 const net = require('net');
 
 const app = express();
@@ -43,7 +43,7 @@ function pingProxy(proxy, callback) {
   }).on('timeout', () => {
     socket.destroy();
     callback(false);
-  }).connect(port, host);
+  }).connect(parseInt(port), host);
 }
 
 function startBot(host, port, proxyList, botCount, delay) {
@@ -57,7 +57,7 @@ function startBot(host, port, proxyList, botCount, delay) {
         port: port ? parseInt(port) : 25565,
         username: BOT_USERNAME,
         hideErrors: false,
-        version: false
+        version: '1.20.1' // Ustawienie wersji Minecrafta
       };
 
       if (proxyList && proxyList.length > 0) {
@@ -65,13 +65,16 @@ function startBot(host, port, proxyList, botCount, delay) {
         pingProxy(proxy, (isAlive) => {
           if (isAlive) {
             const proxyUrl = `socks5://${proxy}`;
-            const agent = new SocksProxyAgent(proxyUrl, {
-              timeout: 5000
-            });
-            botOptions.agent = agent;
-            botOptions.proxyAddress = proxy; // Zapisz adres proxy
-            console.log(`→ Bot ${BOT_USERNAME} will try to connect through proxy ${proxy}`);
-            connectBot(botOptions, BOT_USERNAME);
+            try {
+              const agent = new SocksProxyAgent(proxyUrl); // Poprawne użycie SocksProxyAgent jako klasy
+              botOptions.agent = agent;
+              botOptions.proxyAddress = proxy; // Zapisz adres proxy
+              console.log(`→ Bot ${BOT_USERNAME} will try to connect through proxy ${proxy}`);
+              connectBot(botOptions, BOT_USERNAME);
+            } catch (error) {
+              console.error(`Error creating SocksProxyAgent: ${error.message}`);
+              broadcastToClients(`✉︎ Error creating SocksProxyAgent: ${error.message}`);
+            }
           } else {
             const message = `✉︎ Proxy ${proxy} is not responding. Skipping bot ${BOT_USERNAME}.`;
             console.log(message);
@@ -87,41 +90,46 @@ function startBot(host, port, proxyList, botCount, delay) {
 }
 
 function connectBot(botOptions, BOT_USERNAME) {
-  const bot = mineflayer.createBot(botOptions);
+  try {
+    const bot = mineflayer.createBot(botOptions);
 
-  bot.once('login', () => {
-    const message = `→ Bot ${BOT_USERNAME} Connected through proxy ${botOptions.proxyAddress || 'No proxy'}`;
-    console.log(message);
-    broadcastToClients(message);
-  });
+    bot.once('login', () => {
+      const message = `→ Bot ${BOT_USERNAME} Connected through proxy ${botOptions.proxyAddress || 'No proxy'}`;
+      console.log(message);
+      broadcastToClients(message);
+    });
 
-  bot.once('error', (err) => {
-    const message = `✉︎ Error: Bot ${BOT_USERNAME} - ${err.message}`;
-    console.log(message);
-    broadcastToClients(message);
-  });
+    bot.once('error', (err) => {
+      const message = `✉︎ Error: Bot ${BOT_USERNAME} - ${err.message}`;
+      console.log(message);
+      broadcastToClients(message);
+    });
 
-  bot.on('error', (err) => {
-    const message = `✉︎ Error: ${err.message}`;
-    console.log(message);
-    broadcastToClients(message);
-  });
+    bot.on('error', (err) => {
+      const message = `✉︎ Error: ${err.message}`;
+      console.log(message);
+      broadcastToClients(message);
+    });
 
-  bot.once('end', () => {
-    const message = `← Bot ${BOT_USERNAME} Disconnected`;
-    console.log(message);
-    broadcastToClients(message);
-    bots = bots.filter(b => b !== bot);
-  });
+    bot.once('end', () => {
+      const message = `← Bot ${BOT_USERNAME} Disconnected`;
+      console.log(message);
+      broadcastToClients(message);
+      bots = bots.filter(b => b !== bot);
+    });
 
-  bot.on('end', () => {
-    const message = `← Bot ${BOT_USERNAME} Disconnected`;
-    console.log(message);
-    broadcastToClients(message);
-    bots = bots.filter(b => b !== bot);
-  });
+    bot.on('end', () => {
+      const message = `← Bot ${BOT_USERNAME} Disconnected`;
+      console.log(message);
+      broadcastToClients(message);
+      bots = bots.filter(b => b !== bot);
+    });
 
-  bots.push(bot);
+    bots.push(bot);
+  } catch (error) {
+    console.error(`Error creating bot: ${error.message}`);
+    broadcastToClients(`✉︎ Error creating bot: ${error.message}`);
+  }
 }
 
 // Endpoint do uruchamiania botów
