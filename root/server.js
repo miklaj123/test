@@ -6,7 +6,7 @@ const path = require('path');
 const bodyParser = require('body-parser');
 const http = require('http');
 const WebSocket = require('ws');
-const SocksProxyAgent = require('socks-proxy-agent'); // Import SocksProxyAgent
+const { SocksProxyAgent } = require('socks-proxy-agent'); // Import SocksProxyAgent correctly
 const net = require('net');
 
 const app = express();
@@ -27,12 +27,12 @@ function broadcastToClients(message) {
   });
 }
 
-// Funkcja do pingowania proxy
+// Function to ping proxy
 function pingProxy(proxy, callback) {
   const [host, port] = proxy.split(':');
   const socket = new net.Socket();
 
-  socket.setTimeout(3000); // Timeout ustawiony na 3 sekundy
+  socket.setTimeout(3000); // 3-second timeout
 
   socket.on('connect', () => {
     socket.destroy();
@@ -57,7 +57,7 @@ function startBot(host, port, proxyList, botCount, delay) {
         port: port ? parseInt(port) : 25565,
         username: BOT_USERNAME,
         hideErrors: false,
-        version: '1.20.1' // Ustawienie wersji Minecrafta
+        version: '1.20.1' // Set Minecraft version
       };
 
       if (proxyList && proxyList.length > 0) {
@@ -66,9 +66,9 @@ function startBot(host, port, proxyList, botCount, delay) {
           if (isAlive) {
             const proxyUrl = `socks5://${proxy}`;
             try {
-              const agent = new SocksProxyAgent(proxyUrl); // Poprawne użycie SocksProxyAgent jako klasy
+              const agent = new SocksProxyAgent(proxyUrl); // Correct usage of SocksProxyAgent
               botOptions.agent = agent;
-              botOptions.proxyAddress = proxy; // Zapisz adres proxy
+              botOptions.proxyAddress = proxy; // Save proxy address
               console.log(`→ Bot ${BOT_USERNAME} will try to connect through proxy ${proxy}`);
               connectBot(botOptions, BOT_USERNAME);
             } catch (error) {
@@ -132,7 +132,7 @@ function connectBot(botOptions, BOT_USERNAME) {
   }
 }
 
-// Endpoint do uruchamiania botów
+// Endpoint to start bots
 app.post('/start-bot', (req, res) => {
   const { host, port, proxyList, botCount } = req.body;
   const delay = 1000;
@@ -152,7 +152,7 @@ app.post('/start-bot', (req, res) => {
   res.send('✉︎ Add proxy to start');
 });
 
-// Endpoint do zatrzymywania botów
+// Endpoint to stop bots
 app.post('/stop-bot', (req, res) => {
   if (bots.length === 0) {
     res.send('✉︎ No bot is running');
@@ -170,12 +170,12 @@ app.post('/stop-bot', (req, res) => {
   res.send('');
 });
 
-// Serwer HTTP nasłuchuje na odpowiednim porcie
+// HTTP server listening on the appropriate port
 server.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
 });
 
-// Serwer WebSocket nasłuchuje na odpowiednim porcie
+// WebSocket server listening on the appropriate port
 wss.on('connection', (ws) => {
   ws.send('✉︎ You are connected to bot sender');
 });
